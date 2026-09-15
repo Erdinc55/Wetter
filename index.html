@@ -1,0 +1,105 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Wetter mit Gedächtnis</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+<div class="rahmen">
+
+  <!-- ================= Ortswahl ================= -->
+  <header class="ortswahl">
+
+    <div class="suchfeld-huelle">
+      <label class="versteckt" for="suche">Ort suchen</label>
+      <input type="text" id="suche" autocomplete="off" spellcheck="false"
+             placeholder="Ort suchen …"
+             role="combobox" aria-expanded="false"
+             aria-controls="vorschlaege" aria-autocomplete="list">
+      <ul class="vorschlaege" id="vorschlaege" role="listbox" hidden></ul>
+    </div>
+
+    <button type="button" id="standort" class="knopf-neben">Mein Standort</button>
+  </header>
+
+  <p class="ortsname" id="ortsname">Kein Ort gewählt</p>
+
+  <!-- Meldungen (Fehler, Hinweise) -->
+  <div class="meldung" id="meldung" role="status" hidden></div>
+
+  <!-- ================= Reiter ================= -->
+  <div class="reiter" role="tablist" aria-label="Ansicht wählen">
+    <button type="button" role="tab" id="tab-jetzt"
+            aria-selected="true" aria-controls="panel-jetzt">Jetzt</button>
+    <button type="button" role="tab" id="tab-geschichte"
+            aria-selected="false" aria-controls="panel-geschichte" tabindex="-1">Geschichte</button>
+  </div>
+
+  <!-- ================= Reiter: Jetzt ================= -->
+  <section id="panel-jetzt" role="tabpanel" aria-labelledby="tab-jetzt" class="panel">
+
+    <div class="jetzt-kopf">
+      <div class="jetzt-haupt">
+        <p class="grad" id="jetzt-grad">–</p>
+        <p class="lage" id="jetzt-lage"></p>
+      </div>
+
+      <dl class="werte" id="jetzt-werte">
+        <div><dt>Gefühlt</dt><dd id="w-gefuehlt">–</dd></div>
+        <div><dt>Wind</dt><dd id="w-wind">–</dd></div>
+        <div><dt>Niederschlag</dt><dd id="w-regen">–</dd></div>
+        <div><dt>Luftfeuchte</dt><dd id="w-feuchte">–</dd></div>
+      </dl>
+    </div>
+
+    <section class="abschnitt">
+      <h2>Heute im Stundenverlauf</h2>
+      <div class="stunden-band" id="stunden"></div>
+    </section>
+
+    <section class="abschnitt">
+      <h2>Die nächsten sieben Tage</h2>
+      <ul class="tage" id="tage"></ul>
+    </section>
+
+  </section>
+
+  <!-- ================= Reiter: Geschichte ================= -->
+  <section id="panel-geschichte" role="tabpanel" aria-labelledby="tab-geschichte" class="panel" hidden>
+
+    <p class="einordnung" id="einordnung">–</p>
+
+    <section class="abschnitt">
+      <h2 id="grafik-titel">Dieses Kalenderdatum seit 1940</h2>
+      <div class="grafik-huelle">
+        <svg id="grafik" viewBox="0 0 760 380" role="img" aria-labelledby="grafik-titel"></svg>
+      </div>
+      <p class="legende" id="legende"></p>
+    </section>
+
+    <section class="abschnitt">
+      <h2>Die letzten 30 Tage</h2>
+      <div class="grafik-huelle">
+        <svg id="band" viewBox="0 0 760 140" role="img"
+             aria-label="Höchst- und Tiefstwerte der letzten 30 Tage"></svg>
+      </div>
+    </section>
+
+    <p class="fussnote">
+      Der heutige Wert stammt aus dem Vorhersagemodell, die historischen Werte aus der
+      ERA5-Reanalyse. Das sind unterschiedliche Quellen; kleine Abweichungen sind dadurch
+      möglich. Das Archiv wird mit einigen Tagen Verzug aktualisiert, die jüngsten Tage im
+      Band stammen deshalb ebenfalls aus dem Vorhersagemodell.
+      Daten: Open-Meteo, ERA5 (CC BY 4.0).
+    </p>
+
+  </section>
+
+</div>
+
+<script src="script.js"></script>
+</body>
+</html>
