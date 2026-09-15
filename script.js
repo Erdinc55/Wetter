@@ -1,17 +1,3 @@
-/* ============================================================================
-   Wetter mit Gedächtnis
-   Aktuelles Wetter plus historische Einordnung. Daten von Open-Meteo.
-
-   Für Einsteiger wichtig: Alles, was hier Daten aus dem Internet holt, ist
-   ASYNCHRON. Das heißt, der Browser schickt die Anfrage los und macht sofort
-   weiter, statt zu warten. Die Antwort trifft irgendwann später ein. Deshalb
-   stehen überall `async` und `await`: `await` bedeutet "hier warten, bis die
-   Antwort da ist" — aber nur innerhalb dieser einen Funktion. Der Rest der
-   Seite bleibt in der Zwischenzeit bedienbar. Genau deshalb brauchen wir
-   Ladezustände: Zwischen "Anfrage raus" und "Antwort da" vergeht Zeit, die
-   der Nutzer sehen soll.
-   ========================================================================== */
-
 const API = {
   geo:     "https://geocoding-api.open-meteo.com/v1/search",
   wetter:  "https://api.open-meteo.com/v1/forecast",
@@ -19,25 +5,15 @@ const API = {
 };
 
 const KONFIG = {
-  tippPauseMs: 280,       // so lange nach dem letzten Tastendruck warten
+  tippPauseMs: 280,
   archivStart: "1940-01-01",
-  archivVerzugTage: 6,    // das Archiv hinkt einige Tage hinterher
+  archivVerzugTage: 6,
   vorschauTage: 7,
-  vergangeneTage: 12,     // aus der Vorhersage-API, füllt die Archivlücke
+  vergangeneTage: 12,
   bandTage: 30
 };
 
 const SPEICHER = "wetter-ort";
-
-/* ============================================================================
-   Farbskala
-
-   Sieben Ankerfarben. Zwischen zwei Ankern wird linear interpoliert, deshalb
-   unterscheiden sich 12 und 14 Grad kaum, während -5 und +35 auf klar
-   verschiedenen Ankern landen. Der neutrale Punkt liegt bei 15 Grad statt bei
-   null: So bleibt mildes Wetter unauffällig und die Skala schlägt nur bei
-   wirklich kalten oder heißen Werten aus.
-   ========================================================================== */
 
 const ANKER = [
   { t: -15, c: [ 43,  58, 143] },
@@ -72,10 +48,6 @@ function rgb(c) {
   return `rgb(${Math.round(c[0])} ${Math.round(c[1])} ${Math.round(c[2])})`;
 }
 
-/* ============================================================================
-   Wettercodes nach WMO
-   ========================================================================== */
-
 const LAGE = {
   0: "Klar", 1: "Überwiegend klar", 2: "Teils bewölkt", 3: "Bedeckt",
   45: "Nebel", 48: "Reifnebel",
@@ -90,21 +62,15 @@ const LAGE = {
   95: "Gewitter", 96: "Gewitter mit Hagel", 99: "Gewitter mit Hagel"
 };
 
-/* ============================================================================
-   Zustand
-   ========================================================================== */
-
-let ort = null;            // { name, region, land, lat, lon }
-let archivCache = {};      // Ortsschlüssel -> ausgewertete Archivdaten
+let ort = null;
+let archivCache = {};
 let letzteWetterDaten = null;
 
-let suchAbbruch = null;    // AbortController für die Ortssuche
-let ladeAbbruch = null;    // AbortController für Wetter- und Archivdaten
-let suchLauf = 0;          // Zählernummer gegen überholende Antworten
+let suchAbbruch = null;
+let ladeAbbruch = null;
+let suchLauf = 0;
 let tippTimer = null;
 let markierterVorschlag = -1;
-
-/* ---------- Elemente ---------- */
 
 const elSuche      = document.getElementById("suche");
 const elVorschlag  = document.getElementById("vorschlaege");
@@ -126,10 +92,6 @@ const elEinordnung = document.getElementById("einordnung");
 const elGrafik     = document.getElementById("grafik");
 const elBand       = document.getElementById("band");
 const elLegende    = document.getElementById("legende");
-
-/* ============================================================================
-   Kleine Helfer
-   ========================================================================== */
 
 const SVGNS = "http://www.w3.org/2000/svg";
 
@@ -168,14 +130,6 @@ function meldungWeg() {
   elMeldung.textContent = "";
 }
 
-/* ----------------------------------------------------------------------------
-   Eine Anfrage stellen
-
-   `signal` gehört zu einem AbortController. Wird der abgebrochen, bricht auch
-   diese Anfrage ab und wirft einen Fehler namens "AbortError". Den behandeln
-   wir gesondert, denn ein absichtlicher Abbruch ist kein echter Fehler.
-   -------------------------------------------------------------------------- */
-
 async function holen(basis, parameter, signal) {
   const url = new URL(basis);
   for (const [k, v] of Object.entries(parameter)) url.searchParams.set(k, v);
@@ -184,26 +138,6 @@ async function holen(basis, parameter, signal) {
   if (!antwort.ok) throw new Error("HTTP " + antwort.status);
   return antwort.json();
 }
-
-/* ============================================================================
-   Ortssuche
-
-   Zwei Probleme werden hier gleichzeitig gelöst:
-
-   1. Zu viele Anfragen. Bei jedem Tastendruck sofort zu suchen wäre
-      verschwenderisch. Deshalb wird nach dem letzten Tastendruck kurz
-      gewartet (siehe tippPauseMs). Tippt der Nutzer weiter, wird der
-      Wecker neu gestellt.
-
-   2. Überholende Antworten. Tippst du erst "Mün" und gleich darauf
-      "München", sind zwei Anfragen unterwegs. Antworten kommen nicht
-      zwingend in derselben Reihenfolge zurück — die Antwort zu "Mün"
-      könnte NACH der zu "München" eintreffen und die richtige Liste
-      wieder überschreiben. Dagegen zwei Maßnahmen: Die alte Anfrage wird
-      per AbortController abgebrochen, und zusätzlich bekommt jede Anfrage
-      eine laufende Nummer. Passt die Nummer bei der Rückkehr nicht mehr
-      zur neuesten, wird die Antwort verworfen.
-   ========================================================================== */
 
 async function orteSuchen(begriff) {
   if (suchAbbruch) suchAbbruch.abort();
@@ -216,7 +150,7 @@ async function orteSuchen(begriff) {
       name: begriff, count: 6, language: "de", format: "json"
     }, suchAbbruch.signal);
 
-    if (meineNummer !== suchLauf) return;   // veraltet, verwerfen
+    if (meineNummer !== suchLauf) return;
 
     vorschlaegeZeigen(daten.results || []);
   } catch (fehler) {
@@ -272,10 +206,6 @@ function vorschlagWaehlen(treffer) {
   ortLaden(neu);
 }
 
-/* ============================================================================
-   Daten für einen Ort laden
-   ========================================================================== */
-
 async function ortLaden(neuerOrt) {
   ort = neuerOrt;
   elOrtsname.textContent = [ort.name, ort.region, ort.land].filter(Boolean).join(", ");
@@ -299,9 +229,7 @@ async function ortLaden(neuerOrt) {
     return;
   }
 
-  // Das Archiv ist die große, langsame Anfrage. Sie läuft erst danach, damit
-  // das aktuelle Wetter nicht darauf warten muss.
-  try {
+try {
     const archiv = await archivHolen(signal);
     geschichteZeichnen(archiv);
   } catch (fehler) {
@@ -334,11 +262,6 @@ async function archivHolen(signal) {
   const ende = new Date();
   ende.setDate(ende.getDate() - KONFIG.archivVerzugTage);
 
-  /* Eine große Anfrage statt achtzig kleiner: Jede einzelne Anfrage kostet
-     Verbindungsaufbau und zählt gegen das Ratenlimit. Achtzig Anfragen wären
-     achtzigmal dieser Aufwand für Daten, die derselbe Server ohnehin am Stück
-     vorliegen hat. Mit timeformat=unixtime kommen Zeitstempel als Zahlen
-     statt als Textdaten zurück — das spart bei 30.000 Tagen spürbar Umfang. */
   const daten = await holen(API.archiv, {
     latitude: ort.lat,
     longitude: ort.lon,
@@ -354,11 +277,6 @@ async function archivHolen(signal) {
   return ausgewertet;
 }
 
-/* ----------------------------------------------------------------------------
-   Archiv auswerten: alle Jahre herausfiltern, die auf das heutige
-   Kalenderdatum fallen, plus die letzten Tage für das 30-Tage-Band.
-   -------------------------------------------------------------------------- */
-
 function archivAuswerten(daten) {
   const versatz = daten.utc_offset_seconds || 0;
   const zeiten = daten.daily.time;
@@ -369,14 +287,13 @@ function archivAuswerten(daten) {
   const zielMonat = heute.getMonth();
   const zielTag = heute.getDate();
 
-  const jahre = [];      // { jahr, max }
-  const tageReihe = [];  // { datum, max, min } — chronologisch
+  const jahre = [];
+  const tageReihe = [];
 
   for (let i = 0; i < zeiten.length; i++) {
     const max = maxWerte[i];
     if (max == null) continue;
 
-    // Unixzeit in Ortszeit umrechnen, dann Monat und Tag ablesen
     const d = new Date((zeiten[i] + versatz) * 1000);
     const monat = d.getUTCMonth();
     const tag = d.getUTCDate();
@@ -395,9 +312,6 @@ function archivAuswerten(daten) {
   return { jahre, tageReihe };
 }
 
-/* ============================================================================
-   Ladezustand
-   ========================================================================== */
 
 function ladezustandAn() {
   elGrad.textContent = "–";
@@ -429,10 +343,6 @@ function ladezustandAn() {
   elLegende.textContent = "";
 }
 
-/* ============================================================================
-   Reiter „Jetzt" zeichnen
-   ========================================================================== */
-
 function jetztZeichnen(daten) {
   const jetzt = daten.current;
 
@@ -459,10 +369,6 @@ function stundenZeichnen(daten) {
   const temps = daten.hourly.temperature_2m;
   const heuteISO = jetztDatumISO(daten);
 
-  /* Die Stunde direkt aus dem Zeitstempel lesen, nicht über new Date().
-     Der Zeitstempel steht in der Zeitzone des gesuchten Orts — new Date()
-     würde ihn in die Zeitzone dieses Rechners umrechnen. Bei einem Blick
-     auf Tokio wäre sonst die falsche Stunde markiert. */
   const aktuelleStunde = Number(daten.current.time.slice(11, 13));
 
   const indizes = [];
@@ -506,12 +412,10 @@ function tageZeichnen(daten) {
   const minW = daten.daily.temperature_2m_min;
   const heuteISO = jetztDatumISO(daten);
 
-  // Nur ab heute nach vorn (past_days liefert auch zurückliegende Tage)
   const start = zeiten.indexOf(heuteISO);
   const von = start >= 0 ? start : 0;
   const bis = Math.min(von + KONFIG.vorschauTage, zeiten.length);
 
-  // Gemeinsame Skala über alle angezeigten Tage, damit die Balken vergleichbar sind
   let skalaMin = Infinity, skalaMax = -Infinity;
   for (let i = von; i < bis; i++) {
     if (minW[i] != null) skalaMin = Math.min(skalaMin, minW[i]);
@@ -555,10 +459,6 @@ function tageZeichnen(daten) {
   }
 }
 
-/* ============================================================================
-   Reiter „Geschichte" zeichnen
-   ========================================================================== */
-
 function geschichteZeichnen(archiv) {
   const jahre = archiv.jahre;
 
@@ -571,7 +471,6 @@ function geschichteZeichnen(archiv) {
 
   const heuteMax = heutigerHoechstwert();
 
-  // Einordnung als Satz
   if (heuteMax != null) {
     const kaelter = jahre.filter(j => j.max < heuteMax).length;
     const anteil = Math.round((kaelter / jahre.length) * 100);
@@ -601,11 +500,6 @@ function heutigerHoechstwert() {
   return i >= 0 ? letzteWetterDaten.daily.temperature_2m_max[i] : null;
 }
 
-/* ----------------------------------------------------------------------------
-   Die Doppelgrafik: links Streuung über die Jahre, rechts Verteilung.
-   Beide teilen sich dieselbe senkrechte Temperaturachse.
-   -------------------------------------------------------------------------- */
-
 function grafikZeichnen(jahre, heuteMax) {
   elGrafik.innerHTML = "";
 
@@ -619,7 +513,6 @@ function grafikZeichnen(jahre, heuteMax) {
   const streuBreite = streuRechts - streuLinks;
   const hoehe = H - rand.oben - rand.unten;
 
-  // Wertebereich der Y-Achse
   const werte = jahre.map(j => j.max);
   if (heuteMax != null) werte.push(heuteMax);
   let yMin = Math.min(...werte), yMax = Math.max(...werte);
@@ -632,7 +525,6 @@ function grafikZeichnen(jahre, heuteMax) {
   const yPos = t => rand.oben + hoehe - ((t - yMin) / (yMax - yMin)) * hoehe;
   const xPos = j => streuLinks + ((j - jahrMin) / Math.max(1, jahrMax - jahrMin)) * streuBreite;
 
-  /* --- Y-Achse mit Beschriftung --- */
   const schritt = achsenSchritt(yMax - yMin);
   for (let t = Math.ceil(yMin / schritt) * schritt; t <= yMax; t += schritt) {
     const y = yPos(t);
@@ -646,7 +538,6 @@ function grafikZeichnen(jahre, heuteMax) {
     elGrafik.appendChild(beschriftung);
   }
 
-  /* --- X-Achse: Jahreszahlen --- */
   const jahrSchritte = [];
   for (let j = Math.ceil(jahrMin / 20) * 20; j <= jahrMax; j += 20) jahrSchritte.push(j);
   if (jahrSchritte[jahrSchritte.length - 1] !== jahrMax) jahrSchritte.push(jahrMax);
@@ -659,7 +550,6 @@ function grafikZeichnen(jahre, heuteMax) {
     elGrafik.appendChild(beschriftung);
   });
 
-  /* --- Punkte --- */
   jahre.forEach(j => {
     const kreis = svg("circle", {
       cx: xPos(j.jahr).toFixed(1),
@@ -674,9 +564,6 @@ function grafikZeichnen(jahre, heuteMax) {
     elGrafik.appendChild(kreis);
   });
 
-  /* --- Gleitendes Zehnjahresmittel ---
-     Für jedes Jahr der Durchschnitt aus den fünf Jahren davor und danach.
-     Das glättet einzelne Ausreißer heraus, ohne etwas zu behaupten. */
   const mittel = [];
   for (let i = 0; i < jahre.length; i++) {
     const von = Math.max(0, i - 5);
@@ -691,15 +578,11 @@ function grafikZeichnen(jahre, heuteMax) {
     .join(" ");
   elGrafik.appendChild(svg("path", { d: pfad, class: "mittel-linie" }));
 
-  /* --- Trennlinie zwischen den beiden Hälften --- */
   const xTrenner = streuRechts + luecke / 2;
   elGrafik.appendChild(svg("line", {
     x1: xTrenner, y1: rand.oben, x2: xTrenner, y2: rand.oben + hoehe, class: "trenner"
   }));
 
-  /* --- Verteilung rechts ---
-     Dieselben Werte, nur nach Temperatur in Fächer sortiert. Die Balkenlänge
-     zeigt, wie viele Jahre in dieses Temperaturfach fallen. */
   const faecher = 14;
   const fachHoehe = hoehe / faecher;
   const zaehlung = new Array(faecher).fill(0);
@@ -732,7 +615,6 @@ function grafikZeichnen(jahre, heuteMax) {
     elGrafik.appendChild(balken);
   });
 
-  /* --- Heutiger Wert als durchgehende Linie über beide Hälften --- */
   if (heuteMax != null) {
     const y = yPos(heuteMax);
     elGrafik.appendChild(svg("line", {
@@ -753,15 +635,6 @@ function achsenSchritt(spanne) {
   return 20;
 }
 
-/* ----------------------------------------------------------------------------
-   Das 30-Tage-Band
-
-   Die jüngsten Tage fehlen im Archiv, weil es mit Verzug aktualisiert wird.
-   Die Lücke füllen wir mit den Werten aus der Vorhersage-API, die auch
-   zurückliegende Tage mitliefert. Beide Reihen werden nach Datum
-   zusammengeführt, das Archiv hat dabei Vorrang.
-   -------------------------------------------------------------------------- */
-
 function bandZeichnen(archivReihe) {
   elBand.innerHTML = "";
 
@@ -775,8 +648,8 @@ function bandZeichnen(archivReihe) {
     const heuteISO = jetztDatumISO(letzteWetterDaten);
 
     zeiten.forEach((datum, i) => {
-      if (datum > heuteISO) return;                 // Zukunft gehört nicht ins Band
-      if (nachDatum.has(datum)) return;             // Archiv hat Vorrang
+      if (datum > heuteISO) return;
+      if (nachDatum.has(datum)) return;
       nachDatum.set(datum, { datum, max: maxW[i], min: minW[i] });
     });
   }
@@ -805,7 +678,6 @@ function bandZeichnen(archivReihe) {
   const yPos = t => rand.oben + hoehe - ((t - yMin) / (yMax - yMin)) * hoehe;
   const saeuleBreite = breite / tage.length;
 
-  // Nulllinie bzw. Achsenbeschriftung
   const schritt = achsenSchritt(yMax - yMin);
   for (let t = Math.ceil(yMin / schritt) * schritt; t <= yMax; t += schritt) {
     const y = yPos(t);
@@ -841,7 +713,6 @@ function bandZeichnen(archivReihe) {
     balken.appendChild(titel);
     elBand.appendChild(balken);
 
-    // Beschriftung nur bei jedem fünften Tag, sonst wird es unlesbar
     if (i % 5 === 0) {
       const beschriftung = svg("text", {
         x: (x + saeuleBreite / 2).toFixed(1),
@@ -854,10 +725,6 @@ function bandZeichnen(archivReihe) {
     }
   });
 }
-
-/* ============================================================================
-   Reiter umschalten
-   ========================================================================== */
 
 function reiterWechseln(zuJetzt) {
   tabJetzt.setAttribute("aria-selected", String(zuJetzt));
@@ -880,10 +747,6 @@ tabGesch.addEventListener("click", () => reiterWechseln(false));
     (zuJetzt ? tabJetzt : tabGesch).focus();
   });
 });
-
-/* ============================================================================
-   Eingabe und Tastatur
-   ========================================================================== */
 
 elSuche.addEventListener("input", () => {
   const begriff = elSuche.value.trim();
@@ -920,7 +783,6 @@ document.addEventListener("click", e => {
   if (!e.target.closest(".suchfeld-huelle")) vorschlaegeZeigen([]);
 });
 
-/* ---------- Standortfreigabe ---------- */
 
 elStandort.addEventListener("click", () => {
   if (!navigator.geolocation) {
@@ -949,9 +811,6 @@ elStandort.addEventListener("click", () => {
   );
 });
 
-/* ============================================================================
-   Start
-   ========================================================================== */
 
 (function start() {
   let gespeichert = null;
