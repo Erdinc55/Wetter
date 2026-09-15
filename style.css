@@ -33,7 +33,6 @@ body {
   padding: 30px 20px 60px;
 }
 
-/* ---------- Ortswahl ---------- */
 
 .ortswahl {
   display: flex;
@@ -104,7 +103,6 @@ body {
   color: var(--grau);
 }
 
-/* ---------- Meldungen ---------- */
 
 .meldung {
   margin-top: 14px;
@@ -126,7 +124,6 @@ body {
   color: var(--tinte);
 }
 
-/* ---------- Reiter ---------- */
 
 .reiter {
   display: flex;
@@ -165,7 +162,6 @@ body {
   border-bottom: 1px solid var(--linie);
 }
 
-/* ---------- Jetzt ---------- */
 
 .jetzt-kopf {
   display: flex;
@@ -208,7 +204,6 @@ body {
   margin: 1px 0 0;
 }
 
-/* ---------- Stundenband ---------- */
 
 .stunden-band {
   display: flex;
@@ -244,7 +239,6 @@ body {
 .stunde.jetzt .uhr { color: var(--tinte); font-weight: 400; }
 .stunde.jetzt { background: var(--flaeche); }
 
-/* ---------- Sieben Tage ---------- */
 
 .tage { list-style: none; margin: 0; padding: 0; }
 
@@ -280,8 +274,6 @@ body {
   top: 0; bottom: 0;
   border-radius: 3px;
 }
-
-/* ---------- Geschichte ---------- */
 
 .einordnung {
   margin: 0;
@@ -330,7 +322,6 @@ body {
   max-width: 62ch;
 }
 
-/* ---------- Ladezustand ---------- */
 
 .laedt { position: relative; }
 
@@ -346,7 +337,6 @@ body {
   50% { opacity: 0.2; }
 }
 
-/* ---------- Zugänglichkeit / klein ---------- */
 
 :focus-visible { outline: 2px solid var(--akzent); outline-offset: 2px; }
 
