@@ -44,6 +44,14 @@ Aus demselben Grund steht unten auf der Seite eine Fußnote: Der heutige Wert
 kommt aus dem Vorhersagemodell, die historischen aus der Reanalyse. Das sind
 unterschiedliche Quellen, und ich finde, das gehört dazugesagt.
 
+Lange wusste ich allerdings nicht, wie groß der Unterschied überhaupt ist.
+Inzwischen misst die Seite es selbst: Für das 30-Tage-Band liegen einige Tage
+in beiden Quellen vor, und genau dort vergleicht sie die Werte. Das Ergebnis
+steht in derselben Fußnote, für jeden Ort einzeln.
+
+Aus der offenen Frage ist damit eine Zahl geworden, die sich laufend selbst
+aktualisiert — das gefällt mir deutlich besser als ein einmaliger Stichtag.
+
 Für die Jahrzehnte-Auswertung stelle ich eine einzige große Anfrage über den
 kompletten Zeitraum und filtere die passenden Tage im Browser heraus. 85
 Einzelanfragen wären 85-mal Verbindungsaufbau gewesen.
@@ -63,6 +71,20 @@ Antwort verworfen.
 Das war mein erstes Projekt mit Daten aus dem Internet, und dieser Punkt hat
 mich am meisten überrascht. Bei Daten aus dem eigenen Code stellt sich die
 Frage nie.
+
+## Einheiten
+
+Ein Knopf neben der Ortswahl wechselt zwischen Celsius und Fahrenheit,
+zusammen mit Wind und Niederschlag.
+
+Umgerechnet wird nur bei der Anzeige. Intern bleibt alles in Celsius, km/h und
+Millimetern. Dadurch muss beim Umschalten nichts nachgeladen werden, und die
+Farbskala rechnet unverändert weiter mit denselben Zahlen.
+
+Am kniffligsten waren die Achsen der Diagramme: Die Teilstriche sollen in der
+angezeigten Einheit runde Zahlen sein, ihre Position wird aber weiter aus
+Celsius berechnet. Also wird die Spanne zuerst umgerechnet, dort der Schritt
+bestimmt, und jeder Teilstrich zum Positionieren wieder zurückgerechnet.
 
 ## Farben
 
@@ -96,7 +118,8 @@ Anzahl der Vorhersagetage stehen oben in `script.js` im Block `KONFIG`.
 
 - Die Geschichte-Ansicht braucht beim ersten Aufruf einen Moment, weil rund
   31.000 Tageswerte geladen werden
-- Bei der Standortfreigabe zeige ich nur die Koordinaten an, keinen Ortsnamen —
-  dafür bräuchte es eine umgekehrte Ortssuche
+- Die Ortsnamen bei der Standortfreigabe kommen von einem zweiten Dienst
+  (BigDataCloud), weil Open-Meteo nur den Weg vom Namen zu den Koordinaten
+  kennt. Eine Quelle weniger wäre mir lieber
 
 Daten: Open-Meteo, ERA5 (CC BY 4.0)
