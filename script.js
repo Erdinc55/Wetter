@@ -1,19 +1,22 @@
 const API = {
   geo:     "https://geocoding-api.open-meteo.com/v1/search",
+  rueckwaerts: "https://api.bigdatacloud.net/data/reverse-geocode-client",
   wetter:  "https://api.open-meteo.com/v1/forecast",
   archiv:  "https://archive-api.open-meteo.com/v1/archive"
 };
 
 const KONFIG = {
-  tippPauseMs: 280,
+  tippPauseMs: 280,      
   archivStart: "1940-01-01",
-  archivVerzugTage: 6,
+  archivVerzugTage: 6,    
   vorschauTage: 7,
-  vergangeneTage: 12,
+  vergangeneTage: 12,    
   bandTage: 30
 };
 
 const SPEICHER = "wetter-ort";
+const EINHEIT_SCHLUESSEL = "wetter-einheit";
+
 
 const ANKER = [
   { t: -15, c: [ 43,  58, 143] },
@@ -48,6 +51,7 @@ function rgb(c) {
   return `rgb(${Math.round(c[0])} ${Math.round(c[1])} ${Math.round(c[2])})`;
 }
 
+
 const LAGE = {
   0: "Klar", 1: "Überwiegend klar", 2: "Teils bewölkt", 3: "Bedeckt",
   45: "Nebel", 48: "Reifnebel",
@@ -62,19 +66,23 @@ const LAGE = {
   95: "Gewitter", 96: "Gewitter mit Hagel", 99: "Gewitter mit Hagel"
 };
 
-let ort = null;
-let archivCache = {};
-let letzteWetterDaten = null;
 
-let suchAbbruch = null;
-let ladeAbbruch = null;
-let suchLauf = 0;
+let ort = null;         
+let archivCache = {};     
+let letzteWetterDaten = null;
+let letzteArchivDaten = null;
+
+let suchAbbruch = null; 
+let ladeAbbruch = null; 
+let suchLauf = 0;    
 let tippTimer = null;
 let markierterVorschlag = -1;
+
 
 const elSuche      = document.getElementById("suche");
 const elVorschlag  = document.getElementById("vorschlaege");
 const elStandort   = document.getElementById("standort");
+const elEinheit    = document.getElementById("einheit");
 const elOrtsname   = document.getElementById("ortsname");
 const elMeldung    = document.getElementById("meldung");
 
@@ -92,6 +100,8 @@ const elEinordnung = document.getElementById("einordnung");
 const elGrafik     = document.getElementById("grafik");
 const elBand       = document.getElementById("band");
 const elLegende    = document.getElementById("legende");
+const elQuellen    = document.getElementById("quellen-vergleich");
+
 
 const SVGNS = "http://www.w3.org/2000/svg";
 
@@ -101,9 +111,42 @@ function svg(name, attribute = {}) {
   return el;
 }
 
+
+let imperial = false;
+try { imperial = localStorage.getItem(EINHEIT_SCHLUESSEL) === "imperial"; } catch { }
+
+function nachAnzeige(celsius) {
+  return imperial ? celsius * 9 / 5 + 32 : celsius;
+}
+
+function ausAnzeige(wert) {
+  return imperial ? (wert - 32) * 5 / 9 : wert;
+}
+
+function gradEinheit() { return imperial ? "°F" : "°C"; }
+
 function grad(wert, stellen = 0) {
   if (wert == null || Number.isNaN(wert)) return "–";
-  return wert.toFixed(stellen).replace(".", ",") + " °C";
+  return nachAnzeige(wert).toFixed(stellen).replace(".", ",") + " " + gradEinheit();
+}
+
+function gradKurz(wert) {
+  if (wert == null || Number.isNaN(wert)) return "–";
+  return Math.round(nachAnzeige(wert)) + "°";
+}
+
+function windAnzeige(kmh) {
+  if (kmh == null) return "–";
+  return imperial
+    ? (kmh * 0.621371).toFixed(0) + " mph"
+    : kmh.toFixed(0) + " km/h";
+}
+
+function regenAnzeige(mm) {
+  if (mm == null) return "–";
+  return imperial
+    ? (mm / 25.4).toFixed(2).replace(".", ",") + " in"
+    : mm.toFixed(1).replace(".", ",") + " mm";
 }
 
 function datumISO(d) {
@@ -130,6 +173,7 @@ function meldungWeg() {
   elMeldung.textContent = "";
 }
 
+
 async function holen(basis, parameter, signal) {
   const url = new URL(basis);
   for (const [k, v] of Object.entries(parameter)) url.searchParams.set(k, v);
@@ -138,6 +182,7 @@ async function holen(basis, parameter, signal) {
   if (!antwort.ok) throw new Error("HTTP " + antwort.status);
   return antwort.json();
 }
+
 
 async function orteSuchen(begriff) {
   if (suchAbbruch) suchAbbruch.abort();
@@ -150,7 +195,7 @@ async function orteSuchen(begriff) {
       name: begriff, count: 6, language: "de", format: "json"
     }, suchAbbruch.signal);
 
-    if (meineNummer !== suchLauf) return;
+    if (meineNummer !== suchLauf) return;  
 
     vorschlaegeZeigen(daten.results || []);
   } catch (fehler) {
@@ -206,13 +251,14 @@ function vorschlagWaehlen(treffer) {
   ortLaden(neu);
 }
 
+
 async function ortLaden(neuerOrt) {
   ort = neuerOrt;
   elOrtsname.textContent = [ort.name, ort.region, ort.land].filter(Boolean).join(", ");
   meldungWeg();
   ladezustandAn();
 
-  try { localStorage.setItem(SPEICHER, JSON.stringify(ort)); } catch { /* egal */ }
+  try { localStorage.setItem(SPEICHER, JSON.stringify(ort)); } catch { }
 
   if (ladeAbbruch) ladeAbbruch.abort();
   ladeAbbruch = new AbortController();
@@ -229,8 +275,9 @@ async function ortLaden(neuerOrt) {
     return;
   }
 
-try {
+  try {
     const archiv = await archivHolen(signal);
+    letzteArchivDaten = archiv;
     geschichteZeichnen(archiv);
   } catch (fehler) {
     if (fehler.name === "AbortError") return;
@@ -277,6 +324,7 @@ async function archivHolen(signal) {
   return ausgewertet;
 }
 
+
 function archivAuswerten(daten) {
   const versatz = daten.utc_offset_seconds || 0;
   const zeiten = daten.daily.time;
@@ -287,8 +335,8 @@ function archivAuswerten(daten) {
   const zielMonat = heute.getMonth();
   const zielTag = heute.getDate();
 
-  const jahre = [];
-  const tageReihe = [];
+  const jahre = [];  
+  const tageReihe = []; 
 
   for (let i = 0; i < zeiten.length; i++) {
     const max = maxWerte[i];
@@ -343,6 +391,7 @@ function ladezustandAn() {
   elLegende.textContent = "";
 }
 
+
 function jetztZeichnen(daten) {
   const jetzt = daten.current;
 
@@ -351,10 +400,8 @@ function jetztZeichnen(daten) {
   elLage.textContent = LAGE[jetzt.weather_code] || "—";
 
   document.getElementById("w-gefuehlt").textContent = grad(jetzt.apparent_temperature, 1);
-  document.getElementById("w-wind").textContent =
-    jetzt.wind_speed_10m != null ? jetzt.wind_speed_10m.toFixed(0) + " km/h" : "–";
-  document.getElementById("w-regen").textContent =
-    jetzt.precipitation != null ? jetzt.precipitation.toFixed(1).replace(".", ",") + " mm" : "–";
+  document.getElementById("w-wind").textContent = windAnzeige(jetzt.wind_speed_10m);
+  document.getElementById("w-regen").textContent = regenAnzeige(jetzt.precipitation);
   document.getElementById("w-feuchte").textContent =
     jetzt.relative_humidity_2m != null ? jetzt.relative_humidity_2m + " %" : "–";
 
@@ -393,7 +440,7 @@ function stundenZeichnen(daten) {
 
     const temp = document.createElement("div");
     temp.className = "temp";
-    temp.textContent = t != null ? Math.round(t) + "°" : "–";
+    temp.textContent = gradKurz(t);
 
     d.append(uhr, balken, temp);
     elStunden.appendChild(d);
@@ -437,7 +484,7 @@ function tageZeichnen(daten) {
 
     const min = document.createElement("span");
     min.className = "min";
-    min.textContent = minW[i] != null ? Math.round(minW[i]) + "°" : "–";
+    min.textContent = gradKurz(minW[i]);
 
     const spanneEl = document.createElement("span");
     spanneEl.className = "spanne";
@@ -452,12 +499,13 @@ function tageZeichnen(daten) {
 
     const max = document.createElement("span");
     max.className = "max";
-    max.textContent = maxW[i] != null ? Math.round(maxW[i]) + "°" : "–";
+    max.textContent = gradKurz(maxW[i]);
 
     li.append(tag, min, spanneEl, max);
     elTage.appendChild(li);
   }
 }
+
 
 function geschichteZeichnen(archiv) {
   const jahre = archiv.jahre;
@@ -484,12 +532,33 @@ function geschichteZeichnen(archiv) {
 
   grafikZeichnen(jahre, heuteMax);
   bandZeichnen(archiv.tageReihe);
+  quellenVergleichZeigen();
 
   elLegende.textContent =
     "Links jedes Jahr als einzelner Punkt, eingefärbt nach Temperatur. " +
     "Die durchgezogene Linie ist das gleitende Mittel über zehn Jahre. " +
     "Rechts dieselben Werte zu einer Verteilung zusammengeschoben. " +
     "Die gestrichelte Linie markiert den heutigen Wert.";
+}
+
+function quellenVergleichZeigen() {
+  if (!elQuellen) return;
+
+  if (quellenAbweichungen.length === 0) {
+    elQuellen.textContent = "";
+    return;
+  }
+
+  const summe = quellenAbweichungen.reduce((a, b) => a + b, 0);
+  const mittel = summe / quellenAbweichungen.length;
+  const groesste = Math.max(...quellenAbweichungen);
+  const tage = quellenAbweichungen.length;
+
+  elQuellen.textContent =
+    ` Für die ${tage} ${tage === 1 ? "Tag" : "Tage"}, die an diesem Ort in beiden ` +
+    `Quellen vorliegen, unterscheiden sie sich im Mittel um ` +
+    `${mittel.toFixed(1).replace(".", ",")} Grad, im Größten um ` +
+    `${groesste.toFixed(1).replace(".", ",")} Grad.`;
 }
 
 function heutigerHoechstwert() {
@@ -499,6 +568,7 @@ function heutigerHoechstwert() {
   const i = zeiten.indexOf(heuteISO);
   return i >= 0 ? letzteWetterDaten.daily.temperature_2m_max[i] : null;
 }
+
 
 function grafikZeichnen(jahre, heuteMax) {
   elGrafik.innerHTML = "";
@@ -525,9 +595,12 @@ function grafikZeichnen(jahre, heuteMax) {
   const yPos = t => rand.oben + hoehe - ((t - yMin) / (yMax - yMin)) * hoehe;
   const xPos = j => streuLinks + ((j - jahrMin) / Math.max(1, jahrMax - jahrMin)) * streuBreite;
 
-  const schritt = achsenSchritt(yMax - yMin);
-  for (let t = Math.ceil(yMin / schritt) * schritt; t <= yMax; t += schritt) {
-    const y = yPos(t);
+  const yMinA = nachAnzeige(yMin);
+  const yMaxA = nachAnzeige(yMax);
+  const schritt = achsenSchritt(yMaxA - yMinA);
+
+  for (let t = Math.ceil(yMinA / schritt) * schritt; t <= yMaxA; t += schritt) {
+    const y = yPos(ausAnzeige(t));
     elGrafik.appendChild(svg("line", {
       x1: streuLinks, y1: y, x2: B - rand.rechts, y2: y, class: "achse-linie"
     }));
@@ -610,7 +683,7 @@ function grafikZeichnen(jahre, heuteMax) {
       opacity: 0.85
     });
     const titel = svg("title");
-    titel.textContent = `${anzahl} ${anzahl === 1 ? "Jahr" : "Jahre"} um ${Math.round(fachMitte)} °C`;
+    titel.textContent = `${anzahl} ${anzahl === 1 ? "Jahr" : "Jahre"} um ${grad(fachMitte)}`;
     balken.appendChild(titel);
     elGrafik.appendChild(balken);
   });
@@ -635,8 +708,12 @@ function achsenSchritt(spanne) {
   return 20;
 }
 
+
+let quellenAbweichungen = [];
+
 function bandZeichnen(archivReihe) {
   elBand.innerHTML = "";
+  quellenAbweichungen = [];
 
   const nachDatum = new Map();
   archivReihe.forEach(t => nachDatum.set(t.datum, t));
@@ -648,8 +725,14 @@ function bandZeichnen(archivReihe) {
     const heuteISO = jetztDatumISO(letzteWetterDaten);
 
     zeiten.forEach((datum, i) => {
-      if (datum > heuteISO) return;
-      if (nachDatum.has(datum)) return;
+      if (datum > heuteISO) return;          
+
+      const imArchiv = nachDatum.get(datum);
+      if (imArchiv && imArchiv.max != null && maxW[i] != null) {
+        quellenAbweichungen.push(Math.abs(imArchiv.max - maxW[i]));
+      }
+
+      if (imArchiv) return;                      
       nachDatum.set(datum, { datum, max: maxW[i], min: minW[i] });
     });
   }
@@ -678,9 +761,12 @@ function bandZeichnen(archivReihe) {
   const yPos = t => rand.oben + hoehe - ((t - yMin) / (yMax - yMin)) * hoehe;
   const saeuleBreite = breite / tage.length;
 
-  const schritt = achsenSchritt(yMax - yMin);
-  for (let t = Math.ceil(yMin / schritt) * schritt; t <= yMax; t += schritt) {
-    const y = yPos(t);
+  const yMinA = nachAnzeige(yMin);
+  const yMaxA = nachAnzeige(yMax);
+  const schritt = achsenSchritt(yMaxA - yMinA);
+
+  for (let t = Math.ceil(yMinA / schritt) * schritt; t <= yMaxA; t += schritt) {
+    const y = yPos(ausAnzeige(t));
     elBand.appendChild(svg("line", {
       x1: rand.links, y1: y, x2: B - rand.rechts, y2: y, class: "achse-linie"
     }));
@@ -708,8 +794,8 @@ function bandZeichnen(archivReihe) {
     const titel = svg("title");
     const d = t.datum.slice(8) + "." + t.datum.slice(5, 7) + ".";
     titel.textContent = t.min != null
-      ? `${d}  ${Math.round(t.min)}° bis ${Math.round(t.max)}°`
-      : `${d}  ${Math.round(t.max)}°`;
+      ? `${d}  ${gradKurz(t.min)} bis ${gradKurz(t.max)}`
+      : `${d}  ${gradKurz(t.max)}`;
     balken.appendChild(titel);
     elBand.appendChild(balken);
 
@@ -725,6 +811,7 @@ function bandZeichnen(archivReihe) {
     }
   });
 }
+
 
 function reiterWechseln(zuJetzt) {
   tabJetzt.setAttribute("aria-selected", String(zuJetzt));
@@ -747,6 +834,7 @@ tabGesch.addEventListener("click", () => reiterWechseln(false));
     (zuJetzt ? tabJetzt : tabGesch).focus();
   });
 });
+
 
 elSuche.addEventListener("input", () => {
   const begriff = elSuche.value.trim();
@@ -784,6 +872,52 @@ document.addEventListener("click", e => {
 });
 
 
+async function ortsnameZuKoordinaten(lat, lon) {
+  try {
+    const daten = await holen(API.rueckwaerts, {
+      latitude: lat,
+      longitude: lon,
+      localityLanguage: "de"
+    });
+
+    const name = daten.city || daten.locality || daten.principalSubdivision;
+    if (!name) return null;
+
+    return {
+      name,
+      region: daten.city && daten.principalSubdivision !== daten.city
+        ? daten.principalSubdivision || ""
+        : "",
+      land: daten.countryName || ""
+    };
+  } catch (fehler) {
+    console.warn("Ortsname nicht ermittelbar:", fehler);
+    return null;
+  }
+}
+
+
+function einheitKnopfZeigen() {
+  elEinheit.textContent = gradEinheit();
+  elEinheit.setAttribute("aria-pressed", String(imperial));
+  elEinheit.setAttribute("aria-label",
+    imperial ? "Auf Celsius wechseln" : "Auf Fahrenheit wechseln");
+}
+
+elEinheit.addEventListener("click", () => {
+  imperial = !imperial;
+  try { localStorage.setItem(EINHEIT_SCHLUESSEL, imperial ? "imperial" : "metrisch"); }
+  catch {}
+
+  einheitKnopfZeigen();
+
+  if (letzteWetterDaten) jetztZeichnen(letzteWetterDaten);
+  if (letzteArchivDaten) geschichteZeichnen(letzteArchivDaten);
+});
+
+einheitKnopfZeigen();
+
+
 elStandort.addEventListener("click", () => {
   if (!navigator.geolocation) {
     meldungZeigen("Dein Browser gibt den Standort nicht preis. Nutz die Suche.");
@@ -793,15 +927,27 @@ elStandort.addEventListener("click", () => {
   meldungZeigen("Standort wird abgefragt …");
 
   navigator.geolocation.getCurrentPosition(
-    position => {
+    async position => {
       meldungWeg();
-      ortLaden({
+      const lat = position.coords.latitude;
+      const lon = position.coords.longitude;
+
+      const vorlaeufig = {
         name: "Aktueller Standort",
-        region: position.coords.latitude.toFixed(2) + ", " + position.coords.longitude.toFixed(2),
+        region: lat.toFixed(2) + ", " + lon.toFixed(2),
         land: "",
-        lat: position.coords.latitude,
-        lon: position.coords.longitude
-      });
+        lat, lon
+      };
+      ortLaden(vorlaeufig);
+
+      const benannt = await ortsnameZuKoordinaten(lat, lon);
+      if (benannt && ort && ort.lat === lat && ort.lon === lon) {
+        ort.name = benannt.name;
+        ort.region = benannt.region;
+        ort.land = benannt.land;
+        elOrtsname.textContent = [ort.name, ort.region, ort.land].filter(Boolean).join(", ");
+        try { localStorage.setItem(SPEICHER, JSON.stringify(ort)); } catch { }
+      }
     },
     fehler => {
       console.warn("Standort nicht verfügbar:", fehler);
@@ -817,7 +963,7 @@ elStandort.addEventListener("click", () => {
   try {
     const roh = localStorage.getItem(SPEICHER);
     if (roh) gespeichert = JSON.parse(roh);
-  } catch { /* egal */ }
+  } catch {}
 
   if (gespeichert && gespeichert.lat != null) {
     ortLaden(gespeichert);
