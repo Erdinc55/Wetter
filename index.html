@@ -9,7 +9,6 @@
 <body>
 
 <div class="rahmen">
-
   <header class="ortswahl">
 
     <div class="suchfeld-huelle">
@@ -22,6 +21,8 @@
     </div>
 
     <button type="button" id="standort" class="knopf-neben">Mein Standort</button>
+    <button type="button" id="einheit" class="knopf-neben knopf-einheit"
+            aria-pressed="false" title="Zwischen Celsius und Fahrenheit wechseln">°C</button>
   </header>
 
   <p class="ortsname" id="ortsname">Kein Ort gewählt</p>
@@ -88,6 +89,7 @@
       ERA5-Reanalyse. Das sind unterschiedliche Quellen; kleine Abweichungen sind dadurch
       möglich. Das Archiv wird mit einigen Tagen Verzug aktualisiert, die jüngsten Tage im
       Band stammen deshalb ebenfalls aus dem Vorhersagemodell.
+      <span id="quellen-vergleich"></span>
       Daten: Open-Meteo, ERA5 (CC BY 4.0).
     </p>
 
