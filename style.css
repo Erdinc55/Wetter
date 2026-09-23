@@ -275,6 +275,7 @@ body {
   border-radius: 3px;
 }
 
+
 .einordnung {
   margin: 0;
   font-size: 19px;
@@ -350,4 +351,10 @@ body {
 
 @media (prefers-reduced-motion: reduce) {
   .skelett { animation: none; }
+}
+
+.knopf-einheit {
+  font-family: 'Chivo Mono', monospace;
+  min-width: 52px;
+  text-align: center;
 }
